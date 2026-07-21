@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Score de Churn — Painel (dados via script)</title>
+<style>
+  :root{
+    --bg:#05070d; --bg2:#0a0e17; --card:#0d1320; --card2:#101729; --line:#1c2536;
+    --txt:#dbe2f0; --mut:#6b7690; --mut2:#465068;
+    --purple:#8b7bff; --purple2:#6e5cff; --red:#ff3b4e; --orange:#ffb020; --yellow:#ffd84d;
+    --green:#2fd673; --blue:#5b8cff; --cyan:#3fd0e0;
+    --mono:'Segoe UI','Inter',system-ui,-apple-system,Roboto,'Helvetica Neue',Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg);color:var(--txt);font-family:var(--mono);font-size:13px}
+  ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#222c44;border-radius:5px}::-webkit-scrollbar-track{background:var(--bg)}
+  .wrap{max-width:1880px;margin:0 auto;padding:18px 22px 60px}
+  .hdr{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+  .hdr h1{font-size:21px;letter-spacing:.2px}
+  .hdr .meta{color:var(--mut);font-size:11.5px;margin-top:5px}
+  .hdr .meta b{color:#9aa6c2;font-weight:600}
+  .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px;animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .btns{display:flex;gap:8px;flex-wrap:wrap}
+  .btn{background:var(--card);border:1px solid var(--line);color:var(--txt);font-family:var(--mono);font-size:12px;
+       padding:9px 14px;border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;transition:.15s}
+  .btn:hover{border-color:#33405f;background:var(--card2)}
+  .btn.primary{background:#2447ff;border-color:#2447ff;color:#fff}
+  .btn.primary:hover{background:#3a59ff}
+  .cards{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px}
+  .scard{background:var(--card);border:1px solid var(--line);border-left:3px solid var(--mut2);border-radius:10px;padding:14px 16px;min-height:128px}
+  .scard .lbl{font-size:11px;letter-spacing:1px;color:var(--mut);margin-bottom:6px;text-transform:uppercase}
+  .scard .num{font-size:30px;font-weight:700;letter-spacing:1px}
+  .scard .sub{margin-top:9px;font-size:11px;color:var(--mut)}
+  .scard .sub .row{display:flex;justify-content:space-between;gap:8px;margin-top:3px}
+  .scard.c-canc{border-left-color:var(--purple)} .scard.c-canc .num{color:var(--purple)}
+  .scard.c-crit{border-left-color:var(--red)}    .scard.c-crit .num{color:var(--red)}
+  .scard.c-alto{border-left-color:var(--orange)} .scard.c-alto .num{color:var(--orange)}
+  .scard.c-aten{border-left-color:var(--yellow)} .scard.c-aten .num{color:var(--yellow)}
+  .scard.c-est{border-left-color:var(--green)}   .scard.c-est .num{color:var(--green)}
+  .corr{display:grid;grid-template-columns:1.45fr 1fr;gap:12px;margin-bottom:18px}
+  .panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+  .panel h3{font-size:11.5px;letter-spacing:1px;color:var(--mut);text-transform:uppercase;margin-bottom:10px}
+  .panel h3 b{color:var(--cyan)}
+  canvas{width:100%;display:block}
+  .kpis{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+  .kpi{background:var(--bg2);border:1px solid var(--line);border-radius:8px;padding:9px 11px}
+  .kpi .v{font-size:19px;font-weight:700}
+  .kpi .l{font-size:10px;color:var(--mut);margin-top:3px;line-height:1.35}
+  .mbar{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px}
+  .mbar .nm{flex:0 0 200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#9aa6c2}
+  .mbar .tr{flex:1;height:8px;background:#141b2c;border-radius:4px;overflow:hidden}
+  .mbar .fl{height:100%;border-radius:4px}
+  .mbar .pc{flex:0 0 92px;text-align:right;color:var(--mut)}
+  .legend{display:flex;gap:18px;font-size:11px;color:var(--mut);margin-top:8px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+  .fbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:12px}
+  .search{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 12px;min-width:270px}
+  .search input{background:none;border:none;outline:none;color:var(--txt);font-family:var(--mono);font-size:12px;width:100%}
+  .chip{background:var(--card);border:1px solid var(--line);border-radius:16px;color:var(--mut);font-family:var(--mono);
+        font-size:11.5px;padding:7px 13px;cursor:pointer;transition:.15s}
+  .chip:hover{color:var(--txt)}
+  .chip.on{border-color:#2447ff;color:#7da0ff;background:#0d1630}
+  select{background:var(--card);border:1px solid var(--line);border-radius:8px;color:var(--txt);font-family:var(--mono);font-size:11.5px;padding:8px 10px;outline:none;cursor:pointer}
+  .count{margin-left:auto;color:var(--mut);font-size:11.5px;display:flex;align-items:center;gap:10px}
+  .pgr{display:flex;gap:4px}
+  .pgr button{background:var(--card);border:1px solid var(--line);color:var(--mut);font-family:var(--mono);font-size:11px;min-width:28px;padding:5px 7px;border-radius:6px;cursor:pointer}
+  .pgr button.on{border-color:#2447ff;color:#7da0ff}
+  .pgr button:disabled{opacity:.35;cursor:default}
+  table{width:100%;border-collapse:collapse}
+  thead th{font-size:10.5px;letter-spacing:1px;color:var(--mut);text-transform:uppercase;text-align:left;
+           padding:10px 10px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:2}
+  tbody td{padding:13px 10px;border-bottom:1px solid #11182a;vertical-align:middle;font-size:12px}
+  tbody tr.main{cursor:pointer}
+  tbody tr.main:hover td{background:#0b101d}
+  .cname{font-weight:700;font-size:13px}
+  .cdoc{color:var(--mut);font-size:11px;margin-top:3px}
+  .ccity{color:var(--mut);font-size:11px;margin-top:2px}
+  .ccity .stat-canc{color:var(--red)}
+  .scorebox{display:flex;align-items:center;gap:9px}
+  .sc-badge{min-width:44px;height:30px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:14px}
+  .lvl{font-size:10.5px;margin-top:3px;color:var(--mut)}
+  .tagm{display:inline-block;background:#0e1626;border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;color:#9fb0d6;max-width:230px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hot{color:var(--red);font-weight:700}
+  .warm{color:var(--orange);font-weight:700}
+  .okc{color:var(--green)}
+  .mini{color:var(--mut);font-size:10.5px}
+  .chipsig{display:inline-block;border-radius:5px;padding:3px 7px;font-size:10px;margin:2px 3px 0 0;border:1px solid}
+  .sig-ret{color:#ff7d8a;border-color:#54202b;background:#1c0d12}
+  .sig-rec{color:#ffc46b;border-color:#54401d;background:#1c150a}
+  .sig-tec{color:#7fb1ff;border-color:#21345c;background:#0c1322}
+  .sig-fin{color:#ffd84d;border-color:#4d4218;background:#191507}
+  .sig-rei{color:#d8a5ff;border-color:#3f2a5c;background:#150d22}
+  .expand{background:var(--bg2)}
+  .expand td{padding:14px 18px}
+  .exgrid{display:grid;grid-template-columns:300px 1fr;gap:20px}
+  .pillrow{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:11px}
+  .pillrow .nm{flex:0 0 120px;color:var(--mut)}
+  .pillrow .tr{flex:1;height:7px;background:#141b2c;border-radius:4px;overflow:hidden}
+  .pillrow .fl{height:100%;background:var(--blue);border-radius:4px}
+  .pillrow .pt{flex:0 0 70px;text-align:right;color:#9aa6c2}
+  .tl{font-size:11.5px;width:100%;border-collapse:collapse}
+  .tl td{padding:5px 8px;border-bottom:1px dashed #15203a;color:#9fb0d6}
+  .tl .dt{color:var(--mut);white-space:nowrap}
+  .arrow{display:inline-block;transition:.15s;color:var(--mut2);margin-right:4px}
+  tr.open .arrow{transform:rotate(90deg)}
+  .landing{border:1px dashed #28324d;border-radius:14px;padding:60px 30px;text-align:center;margin-top:30px}
+  .landing h2{font-size:18px;margin-bottom:10px}
+  .landing p{color:var(--mut);max-width:680px;margin:6px auto;line-height:1.7;font-size:12.5px}
+  .landing code{background:#101729;border:1px solid var(--line);padding:2px 7px;border-radius:5px;color:#9fd0ff;font-size:11.5px}
+  .ovl{position:fixed;inset:0;background:rgba(2,4,9,.78);display:none;align-items:flex-start;justify-content:center;z-index:50;overflow:auto;padding:30px 16px}
+  .ovl.show{display:flex}
+  .modal{background:var(--bg2);border:1px solid #232e48;border-radius:14px;max-width:980px;width:100%;padding:24px 26px;position:relative}
+  .modal h2{font-size:16px;margin-bottom:4px}
+  .modal .sub{color:var(--mut);font-size:11.5px;margin-bottom:18px}
+  .mhdr{display:flex;justify-content:space-between;align-items:flex-start;gap:14px}
+  .x{background:none;border:none;color:var(--mut);font-size:18px;cursor:pointer;font-family:var(--mono)}
+  .rulebox{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  .rulebox h4{font-size:11px;letter-spacing:1px;text-transform:uppercase;margin-bottom:12px}
+  .wgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .wgrid label{display:block;font-size:10.5px;color:var(--mut);margin-bottom:5px}
+  input[type=number]{background:#0a0f1b;border:1px solid #243049;border-radius:7px;color:var(--txt);
+     font-family:var(--mono);font-size:12px;padding:7px 9px;width:100%;outline:none;text-align:right}
+  .classgrid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .clc{border:1px solid var(--line);border-radius:10px;padding:11px;font-size:11px}
+  .clc b{display:block;font-size:13px;margin-bottom:3px}
+  .clc span{color:var(--mut);font-size:10.5px}
+  .err{color:var(--red);font-size:11px;margin-top:8px;display:none}
+  .report{background:#fff0;max-width:900px}
+  .sheet{background:var(--bg2)}
+  .rsec{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+  .rsec h4{font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);margin-bottom:10px}
+  .rnum{display:inline-flex;width:20px;height:20px;border-radius:50%;border:1px solid var(--cyan);color:var(--cyan);font-size:11px;align-items:center;justify-content:center;margin-right:8px}
+  .r3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .r5{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+  .rcard{border:1px solid var(--line);border-radius:9px;padding:11px}
+  .rcard .v{font-size:22px;font-weight:700}
+  .rcard .l{color:var(--mut);font-size:10.5px;margin-top:4px;line-height:1.4}
+  .rfoot{display:flex;justify-content:space-between;color:var(--mut);font-size:10px;margin-top:14px}
+  .toast{position:fixed;right:18px;bottom:18px;z-index:80;display:flex;flex-direction:column;gap:8px}
+  .toast .t{background:#0e1c12;border:1px solid #1d4a32;color:var(--green);padding:11px 15px;border-radius:9px;font-size:12px;animation:fadein .25s}
+  .toast .t.info{background:#0c1322;border-color:#21345c;color:#7fb1ff}
+  @keyframes fadein{from{opacity:0;transform:translateY(8px)}to{opacity:1}}
+  .hide{display:none!important}
+  @media (max-width:1400px){.cards{grid-template-columns:repeat(3,1fr)}.corr{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hdr">
+    <div>
+      <h1>Score de Churn <span style="color:var(--mut);font-weight:400;font-size:13px">· Cancelados vs Atendimentos</span></h1>
+      <div class="meta" id="metaLine">Carregando dados…</div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="btnResumo">▦ Resumo</button>
+      <button class="btn" id="btnRegras">◎ Pesos do score</button>
+      <button class="btn" id="btnCsv">⤓ Exportar CSV</button>
+    </div>
+  </div>
+
+  <div class="landing" id="landing">
+    <h2>Dados não encontrados</h2>
+    <p>Este painel exibe o resultado gerado pelo script <code>processar_churn.py</code> —
+       ele lê os arquivos <code>Atendimento*.xlsx</code> / <code>Cancelados*.xlsx</code>,
+       calcula o score de churn de cada cliente e grava o <code>dados_churn.js</code> nesta pasta.</p>
+    <p style="margin-top:18px"><b style="color:var(--txt)">Para gerar os dados:</b><br><br>
+       1. Coloque <code>processar_churn.py</code> e este HTML na pasta Churn (junto dos .xlsx);<br>
+       2. Execute: <code>python processar_churn.py --watch</code> (ou dê 2 cliques em <code>Atualizar_Churn.bat</code>);<br>
+       3. Recarregue esta página. Com o <code>--watch</code> ativo, novos períodos salvos na pasta
+          são reprocessados e o painel se atualiza sozinho.</p>
+  </div>
+
+  <div id="app" class="hide">
+    <div class="cards" id="cards"></div>
+    <div class="corr">
+      <div class="panel">
+        <h3>Correlação mensal — <b>atendimentos</b> (barras) × <b>cancelamentos</b> (linha)</h3>
+        <canvas id="chart" height="240"></canvas>
+        <div class="legend">
+          <span><i style="background:#2447ff"></i>Atendimentos</span>
+          <span><i style="background:var(--red)"></i>Cancelamentos</span>
+          <span id="corrCoef" style="margin-left:auto"></span>
+        </div>
+      </div>
+      <div class="panel">
+        <h3>Diagnóstico de churn</h3>
+        <div class="kpis" id="kpis"></div>
+        <h3 style="margin-top:6px">Motivos com maior conversão em cancelamento</h3>
+        <div id="motivoBars"></div>
+      </div>
+    </div>
+
+    <div class="fbar">
+      <div class="search">🔍<input id="q" placeholder="Buscar nome, CPF, ID ou cidade..."></div>
+      <button class="chip on" data-f="todos">Todos</button>
+      <button class="chip" data-f="cancelado">Cancelados</button>
+      <button class="chip" data-f="critico">Crítico</button>
+      <button class="chip" data-f="alto">Alto risco</button>
+      <button class="chip" data-f="atencao">Atenção</button>
+      <button class="chip" data-f="estavel">Estável</button>
+      <select id="selCidade"><option value="">Cidades</option></select>
+      <select id="selMotivo"><option value="">Motivo (90d)</option></select>
+      <select id="selOrd">
+        <option value="score_desc">Score: maior primeiro</option>
+        <option value="score_asc">Score: menor primeiro</option>
+        <option value="at90_desc">Atendimentos 90d</option>
+        <option value="rec_asc">Último atendimento</option>
+        <option value="nome">Nome A–Z</option>
+      </select>
+      <div class="count"><span id="nres"></span><div class="pgr" id="pgr"></div></div>
+    </div>
+
+    <table>
+      <thead><tr>
+        <th style="width:19%">Cliente</th><th>Score churn</th><th>Atend. 90d</th><th>Último atend.</th>
+        <th>Tendência 6m</th><th>Motivo predominante</th><th>LTV / Ticket médio</th><th>Contato</th><th>Sinais de risco</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+  </div>
+</div>
+
+<div class="ovl" id="ovlRegras">
+  <div class="modal">
+    <div class="mhdr">
+      <div><h2>Pesos dos pilares do score</h2>
+        <div class="sub">Os pesos são reaplicados na hora sobre os pontos já calculados (salvos no navegador).
+        Pontos por faixa e palavras-chave são definidos no <b>processar_churn.py</b> (ou churn_config.json) e
+        aplicados na próxima execução do script.</div></div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="btnReset">Restaurar padrão</button>
+        <button class="btn primary" id="btnSave">Aplicar pesos</button>
+        <button class="x" data-close="ovlRegras">✕</button>
+      </div>
+    </div>
+    <div class="rulebox"><h4 style="color:var(--purple)">Pesos — <span id="wSum" style="color:var(--green)">soma: 100%</span> <span style="color:var(--mut);text-transform:none;letter-spacing:0">(se a soma for diferente, os valores são redistribuídos proporcionalmente para fechar 100% ao aplicar)</span></h4>
+      <div class="wgrid">
+        <div><label>Frequência %</label><input type="number" id="wFreq" min="0"></div>
+        <div><label>Recência %</label><input type="number" id="wRec" min="0"></div>
+        <div><label>Motivos %</label><input type="number" id="wMot" min="0"></div>
+        <div><label>Tendência %</label><input type="number" id="wTend" min="0"></div>
+        <div><label>Reincidência %</label><input type="number" id="wRei" min="0"></div>
+      </div>
+      <div class="err" id="wErr"></div>
+    </div>
+    <div class="rulebox"><h4 style="color:var(--cyan)">Como cada pilar é calculado</h4>
+      <div style="font-size:11.5px;color:#9aa6c2;line-height:1.7">
+        <b style="color:var(--blue)">Frequência</b> — nº de atendimentos do cliente nos últimos 90 dias, pontuado por faixa
+        (1 atendimento → 20 pts · 2 → 40 · 3 → 60 · 4 → 75 · 5 → 85 · 6 ou mais → 100).<br>
+        <b style="color:var(--orange)">Recência</b> — dias desde o último atendimento: contato recente indica problema ativo
+        (até 7 dias → 100 pts · 8–15 → 80 · 16–30 → 60 · 31–60 → 40 · 61–90 → 20 · mais de 90 → 5 · nunca abriu chamado → 0).<br>
+        <b style="color:var(--green)">Motivos</b> — cada atendimento dos últimos 90 dias é classificado por palavras-chave
+        (no motivo e nas categorias do chamado); vale o <b>maior</b> entre os pontos do grupo
+        (Cancelamento/Retenção 100 · Reclamação 85 · Falha técnica 70 · Financeiro 45 · Suporte 30 · Comercial 15)
+        e a taxa real de conversão daquele motivo em cancelamento observada na própria base (lift × 25, máx. 100).<br>
+        <b style="color:var(--yellow)">Tendência</b> — compara os atendimentos dos últimos 30 dias com a média mensal dos 60 dias
+        anteriores: crescimento ≥ 3× → 100 pts · ≥ 2× → 80 · ≥ 1,5× → 60 · estável → 40 · em queda → 15 ·
+        primeiro chamado do período (sem histórico anterior) → 60.<br>
+        <b style="color:var(--purple)">Reincidência</b> — mesmo motivo repetido nos últimos 90 dias:
+        2 vezes → 70 pts · 3 ou mais → 100. Problema que volta é o maior preditor de cancelamento.<br>
+        <span style="color:var(--mut)">Score final = soma dos pontos de cada pilar ponderada pelos pesos acima (0–100 = probabilidade de churn).
+        Faixas de pontos e palavras-chave são editadas no script (bloco RULES) ou no churn_config.json.</span>
+      </div>
+    </div>
+    <div class="rulebox"><h4>Classificação final (probabilidade de churn)</h4>
+      <div class="classgrid">
+        <div class="clc" style="border-color:#3a2a6e"><b style="color:var(--purple)">—</b>Cancelado<br><span>Já saiu da base.</span></div>
+        <div class="clc" style="border-color:#54202b"><b style="color:var(--red)">80 – 100</b>Crítico<br><span>Churn iminente.</span></div>
+        <div class="clc" style="border-color:#54401d"><b style="color:var(--orange)">60 – 79</b>Alto risco<br><span>Agir esta semana.</span></div>
+        <div class="clc" style="border-color:#4d4218"><b style="color:var(--yellow)">40 – 59</b>Atenção<br><span>Sinais de alerta.</span></div>
+        <div class="clc" style="border-color:#1d4a32"><b style="color:var(--green)">0 – 39</b>Estável<br><span>Base saudável.</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="ovl" id="ovlResumo">
+  <div class="modal report">
+    <div class="mhdr">
+      <h2 style="color:var(--mut);font-size:13px;font-weight:400">Relatório Executivo — visualização A4</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn primary" id="btnPrint">🖨 Imprimir / Salvar PDF</button>
+        <button class="x" data-close="ovlResumo">✕ Fechar</button>
+      </div>
+    </div>
+    <div class="sheet" id="repPrint" style="border:1px solid var(--line);border-radius:10px;padding:22px 24px"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const fmt = n => Number(n||0).toLocaleString('pt-BR');
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const norm = s => String(s==null?'':s).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim();
+const onlyDigits = s => String(s==null?'':s).replace(/\D/g,'');
+// "tratamento" de cidade/bairro: Title Case (dados vêm misturados: CAIXA ALTA, minúsculas…)
+const tc = s => String(s==null?'':s).toLowerCase().trim()
+  .replace(/(^|[\s\-\/.(])([a-zà-úà-ÿ])/g, (m,a,b)=>a+b.toUpperCase())
+  .replace(/\b(D[aeo]s?|E|Em|De)\b/g, w=>w.toLowerCase());
+const fmtMoney = (v,dec=2) => v==null?null:'R$ '+Number(v).toLocaleString('pt-BR',{minimumFractionDigits:dec,maximumFractionDigits:dec});
+function fmtPhone(t){
+  const d = onlyDigits(t);
+  if (d.length===11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  if (d.length===10) return `(${d.slice(0,2)}) ${d.slice(2,6)}-${d.slice(6)}`;
+  return t||'';
+}
+const MESES_LBL = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+const monthLabel = k => { const [y,m]=k.split('-'); return MESES_LBL[+m-1]+'/'+y.slice(2); };
+
+let D = null;                       // dados do script (window.DADOS_CHURN)
+let W = loadWeights();              // pesos (override local)
+let state = { q:'', f:'todos', cidade:'', motivo:'', ord:'score_desc', page:1, open:new Set() };
+const PAGE = 25;
+
+function loadWeights(){
+  try{ const s = localStorage.getItem('churnWeights.v1'); if (s) return JSON.parse(s); }catch(e){}
+  return null; // usa os pesos do script
+}
+function weights(){ return W || (D && D.rules.weights) || {freq:30,rec:20,mot:25,tend:15,rei:10}; }
+
+function applyScores(){
+  const w = weights();
+  for (const c of D.clients){
+    c.sc = Math.round((c.p[0]*w.freq + c.p[1]*w.rec + c.p[2]*w.mot + c.p[3]*w.tend + c.p[4]*w.rei)/100);
+    c.lv = c.cx ? 'cancelado' : c.sc>=80?'critico' : c.sc>=60?'alto' : c.sc>=40?'atencao' : 'estavel';
+  }
+}
+
+function toast(msg, cls){
+  const d = document.createElement('div');
+  d.className = 't'+(cls?' '+cls:'');
+  d.textContent = msg;
+  $('#toast').appendChild(d);
+  setTimeout(()=>d.remove(), 5200);
+}
+
+// ---------- carga / auto-refresh ----------
+function dataLoaded(){
+  if (!window.DADOS_CHURN) return false;
+  D = window.DADOS_CHURN;
+  applyScores();
+  $('#landing').classList.add('hide');
+  $('#app').classList.remove('hide');
+  renderAll();
+  return true;
+}
+function checkRefresh(){
+  const prev = D ? D.geradoEm : null;
+  const s = document.createElement('script');
+  s.src = 'dados_churn.js?v=' + Date.now();
+  s.onload = () => {
+    if (window.DADOS_CHURN && window.DADOS_CHURN.geradoEm !== prev){
+      const first = !D;
+      dataLoaded();
+      if (!first) toast('Dados atualizados pelo script — painel recarregado.');
+    }
+    s.remove();
+  };
+  s.onerror = () => s.remove();
+  document.body.appendChild(s);
+}
+setInterval(checkRefresh, 8000);
+
+// ---------- render ----------
+function levelInfo(lv){
+  return {
+    cancelado:{ lbl:'Cancelado', color:'var(--purple)', bg:'#1a1430' },
+    critico:  { lbl:'Crítico',   color:'var(--red)',    bg:'#23090e' },
+    alto:     { lbl:'Alto risco',color:'var(--orange)', bg:'#231806' },
+    atencao:  { lbl:'Atenção',   color:'var(--yellow)', bg:'#201b06' },
+    estavel:  { lbl:'Estável',   color:'var(--green)',  bg:'#08200f' },
+  }[lv];
+}
+function corColor(r){ if (r==null) return 'var(--mut)'; const a=Math.abs(r); return a>=.7?'var(--red)':a>=.4?'var(--orange)':'var(--green)'; }
+
+function renderAll(){
+  // cada seção isolada: um erro num gráfico não pode derrubar o resto do painel
+  for (const f of [renderMeta, renderCards, renderChart, renderKpis, renderMotivos, refreshSelects, renderTable]){
+    try{ f(); }catch(e){ console.error('[churn]', f.name, e); }
+  }
+}
+
+function renderMeta(){
+  const t = D.totals;
+  const per = D.months.length ? monthLabel(D.months[0])+' – '+monthLabel(D.months[D.months.length-1]) : '—';
+  $('#metaLine').innerHTML = `<span class="dot"></span>`+
+    `Gerado via script em <b>${esc(D.geradoEm)}</b> · ${D.arquivos.length} arquivos · <b>${fmt(t.clientes)}</b> clientes · `+
+    `<b>${fmt(t.atendimentos)}</b> atendimentos · <b>${fmt(t.cancelamentos)}</b> cancelamentos · ${per} · `+
+    `<span style="color:var(--green)">auto-atualização ativa</span>`;
+}
+
+function renderCards(){
+  const L = D.clients;
+  const by = lv => L.reduce((s,x)=>s+(x.lv===lv), 0);
+  const canc = L.filter(x=>x.cx);
+  const motCount = new Map();
+  for (const c of canc){ const m = (c.cx.m)||'Não informado'; motCount.set(m,(motCount.get(m)||0)+1); }
+  const topM = [...motCount.entries()].sort((a,b)=>b[1]-a[1]).slice(0,3);
+  $('#cards').innerHTML = `
+    <div class="scard c-canc"><div class="lbl">Cancelados</div><div class="num">${fmt(canc.length)}</div>
+      <div class="sub">${topM.map(([m,n])=>`<div class="row"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(m)}</span><b style="color:var(--purple)">${fmt(n)}</b></div>`).join('')||'<div class="row">—</div>'}</div></div>
+    <div class="scard c-crit"><div class="lbl">Crítico (80–100)</div><div class="num">${fmt(by('critico'))}</div><div class="sub">Churn iminente — contato hoje.</div></div>
+    <div class="scard c-alto"><div class="lbl">Alto risco (60–79)</div><div class="num">${fmt(by('alto'))}</div><div class="sub">Ação de retenção esta semana.</div></div>
+    <div class="scard c-aten"><div class="lbl">Atenção (40–59)</div><div class="num">${fmt(by('atencao'))}</div><div class="sub">Acompanhar evolução.</div></div>
+    <div class="scard c-est"><div class="lbl">Estável (0–39)</div><div class="num">${fmt(by('estavel'))}</div><div class="sub">Base saudável.</div></div>`;
+}
+
+function renderKpis(){
+  const t = D.totals, r = D.r0, rl = D.rLag;
+  const ratio = t.avgActive90>0 ? t.avgPrevCanc/t.avgActive90 : null;
+  $('#kpis').innerHTML = `
+    <div class="kpi"><div class="v" style="color:${corColor(r)}">${r==null?'—':r.toFixed(2)}</div><div class="l">correlação (Pearson) atendimentos × cancelamentos no mês</div></div>
+    <div class="kpi"><div class="v" style="color:${corColor(rl)}">${rl==null?'—':rl.toFixed(2)}</div><div class="l">correlação defasada — atendimentos do mês anterior × cancelamentos</div></div>
+    <div class="kpi"><div class="v" style="color:var(--red)">${(t.prev90pct*100).toFixed(0)}%</div><div class="l">dos cancelados abriram atendimento nos 90 dias antes de sair</div></div>
+    <div class="kpi"><div class="v" style="color:var(--orange)">${t.avgPrevCanc.toFixed(1)}×${ratio!=null?' <span style="font-size:11px;color:var(--mut)">vs '+t.avgActive90.toFixed(1)+' da base</span>':''}</div><div class="l">média de atendimentos nos 90d pré-cancelamento ${ratio!=null?('('+ratio.toFixed(1)+'× a base ativa)'):''}</div></div>`;
+}
+
+function renderMotivos(){
+  const rows = D.motivoTable.slice(0,7);
+  const max = Math.max(.0001, ...rows.map(m=>m.rate));
+  $('#motivoBars').innerHTML = rows.map(m=>{
+    const col = m.lift>=2?'var(--red)':m.lift>=1.2?'var(--orange)':'var(--green)';
+    return `<div class="mbar"><span class="nm" title="${esc(m.label)}">${esc(m.label)}</span>
+      <span class="tr"><span class="fl" style="width:${Math.max(3,m.rate/max*100)}%;background:${col}"></span></span>
+      <span class="pc">${(m.rate*100).toFixed(0)}% · ${m.lift.toFixed(1)}×</span></div>`;
+  }).join('') || '<div class="mini">Sem volume suficiente para análise por motivo.</div>';
+}
+
+function refreshSelects(){
+  // dedupe por forma normalizada (OLÍMPIA / Olimpia / olímpia = mesma cidade)
+  const cm = new Map();
+  for (const x of D.clients){ const k = norm(x.ci); if (k && !cm.has(k)) cm.set(k, tc(x.ci)); }
+  const cities = [...cm.entries()].sort((a,b)=>a[1].localeCompare(b[1],'pt-BR'));
+  const mots = [...new Set(D.clients.map(x=>x.mp).filter(Boolean))].sort();
+  $('#selCidade').innerHTML = `<option value="">Cidades</option>`+
+    cities.map(([k,l])=>`<option value="${esc(k)}" ${k===state.cidade?'selected':''}>${esc(l)}</option>`).join('');
+  fillSel($('#selMotivo'), mots, 'Motivo (90d)', state.motivo);
+}
+function fillSel(sel, arr, lbl, cur){
+  sel.innerHTML = `<option value="">${lbl}</option>`+arr.map(c=>`<option ${c===cur?'selected':''}>${esc(c)}</option>`).join('');
+}
+
+function filtered(){
+  let L = D.clients;
+  if (state.f!=='todos') L = L.filter(x=>x.lv===state.f);
+  if (state.cidade) L = L.filter(x=>norm(x.ci)===state.cidade);
+  if (state.motivo) L = L.filter(x=>x.mp===state.motivo);
+  if (state.q){
+    const q = norm(state.q), qd = onlyDigits(state.q);
+    L = L.filter(x => norm(x.n).includes(q) || norm(x.ci).includes(q) ||
+                      (qd && (onlyDigits(x.d).includes(qd) || String(x.id||'').includes(qd))));
+  }
+  const cmp = {
+    score_desc:(a,b)=> (b.cx?-1:b.sc)-(a.cx?-1:a.sc),
+    score_asc: (a,b)=> (a.cx?-1:a.sc)-(b.cx?-1:b.sc),
+    at90_desc: (a,b)=> b.t90-a.t90,
+    rec_asc:   (a,b)=> (a.ds==null?1e9:a.ds)-(b.ds==null?1e9:b.ds),
+    nome:      (a,b)=> a.n.localeCompare(b.n,'pt-BR'),
+  }[state.ord];
+  return [...L].sort(cmp);
+}
+
+function renderTable(){
+  const L = filtered();
+  const pages = Math.max(1, Math.ceil(L.length/PAGE));
+  if (state.page>pages) state.page = pages;
+  const pg = L.slice((state.page-1)*PAGE, state.page*PAGE);
+  $('#nres').textContent = fmt(L.length)+' clientes';
+  renderPager(pages);
+
+  $('#tbody').innerHTML = pg.map((x,i)=>{
+    const li = levelInfo(x.lv);
+    const k = x.id||x.d||x.n;
+    const open = state.open.has(k);
+    const badge = x.cx
+      ? `<span class="sc-badge" style="background:${li.bg};color:${li.color}">—</span>`
+      : `<span class="sc-badge" style="background:${li.bg};color:${li.color}">${x.sc}</span>`;
+    const sigs = [];
+    if (x.sg.includes('ret')) sigs.push('<span class="chipsig sig-ret">pediu cancelamento</span>');
+    if (x.sg.includes('ins')) sigs.push('<span class="chipsig sig-ret">reclamação</span>');
+    if (x.sg.includes('tec')) sigs.push('<span class="chipsig sig-tec">falha técnica</span>');
+    if (x.sg.includes('fin')) sigs.push('<span class="chipsig sig-fin">financeiro</span>');
+    if (x.mr>=2) sigs.push(`<span class="chipsig sig-rei">reincidente ${x.mr}x</span>`);
+    if (x.ds!=null && x.ds<=7 && !x.cx) sigs.push('<span class="chipsig sig-rec">contato recente</span>');
+    const cstat = x.cx ? `<span class="stat-canc">Cancelado${x.cx.d?' em '+esc(x.cx.d):''}</span>` : '';
+    const ltv = (x.vl && x.ms) ? x.vl*x.ms : null;
+    const local = [tc(x.ci), tc(x.b)].filter(Boolean).join(' · ') || '—';
+    const cpfLine = (x.d ? esc(x.d) : '<span class="mini">CPF não consta</span>') + (x.id ? ` <span class="mini">· ID ${esc(x.id)}</span>` : '');
+    return `
+    <tr class="main ${open?'open':''}" data-k="${esc(k)}">
+      <td><span class="arrow">▶</span><span class="cname">${esc(x.n)}</span>
+        <div class="cdoc" style="margin-left:17px">${cpfLine}</div>
+        <div class="ccity" style="margin-left:17px">${esc(local)} ${cstat}</div></td>
+      <td><div class="scorebox">${badge}<div><div style="font-weight:700;color:${li.color}">${li.lbl}</div>
+        ${x.cx&&x.cx.m?`<div class="lvl">${esc(x.cx.m)}</div>`:`<div class="lvl">prob. churn</div>`}</div></div></td>
+      <td>${x.t90>0?`<span class="${x.t90>=4?'hot':x.t90>=2?'warm':''}">${x.t90}x</span>`:'<span class="mini">0</span>'}</td>
+      <td>${x.ds==null?'<span class="mini">—</span>':
+            `<span class="${x.ds<=7?'hot':x.ds<=30?'warm':'okc'}">${x.ds}d</span>`}</td>
+      <td>${spark(x.t6)}</td>
+      <td>${x.mp?`<span class="tagm" title="${esc(x.mp)}">${esc(x.mp)}</span>`:'<span class="mini">—</span>'}</td>
+      <td>${ltv!=null?`<b>${fmtMoney(ltv,0)}</b>`:'<span class="mini">—</span>'}
+        <div class="mini">${[x.vl?fmtMoney(x.vl)+'/mês':null, x.ms?Math.round(x.ms)+'m de casa':null].filter(Boolean).join(' · ')||''}</div></td>
+      <td>${x.tf?esc(fmtPhone(x.tf)):'<span class="mini">—</span>'}
+        <div class="mini" style="max-width:170px;overflow:hidden;text-overflow:ellipsis" title="${esc(x.em||'')}">${esc(x.em||'')}</div></td>
+      <td>${sigs.join('')||'<span class="mini">—</span>'}</td>
+    </tr>
+    ${open?expandRow(x):''}`;
+  }).join('');
+
+  $$('#tbody tr.main').forEach(tr=>{
+    tr.addEventListener('click', ()=>{
+      const k = tr.dataset.k;
+      state.open.has(k) ? state.open.delete(k) : state.open.add(k);
+      renderTable();
+    });
+  });
+}
+
+function spark(arr){
+  const max = Math.max(1,...arr);
+  const w = 9, gap = 3, H = 22;
+  const bars = arr.map((v,i)=>{
+    const h = Math.max(2, v/max*H);
+    const col = i===arr.length-1 && v>0 && v>=max ? 'var(--red)' : '#3d4f7d';
+    return `<rect x="${i*(w+gap)}" y="${H-h}" width="${w}" height="${h}" rx="1.5" fill="${col}"/>`;
+  }).join('');
+  return `<svg width="${6*(w+gap)}" height="${H}" style="vertical-align:middle">${bars}</svg> <span class="mini">${arr[arr.length-1]}/mês</span>`;
+}
+
+function expandRow(x){
+  const w = weights();
+  const P = [
+    ['Frequência', x.p[0], w.freq], ['Recência', x.p[1], w.rec], ['Motivos', x.p[2], w.mot],
+    ['Tendência', x.p[3], w.tend], ['Reincidência', x.p[4], w.rei],
+  ];
+  const pills = P.map(([n,v,wt])=>`<div class="pillrow"><span class="nm">${n} · ${wt}%</span>
+      <span class="tr"><span class="fl" style="width:${v}%;background:${v>=80?'var(--red)':v>=60?'var(--orange)':v>=40?'var(--yellow)':'var(--blue)'}"></span></span>
+      <span class="pt">${v} pts</span></div>`).join('');
+  const tl = (x.tl||[]).map(t=>`<tr><td class="dt">${esc(t[0]||'—')}</td>
+      <td>${esc(t[1]||'—')}</td><td class="mini">${esc(t[2]||'')}</td><td class="mini">${esc(t[3]||'')}</td></tr>`).join('');
+  const cancInfo = x.cx ? `<div style="margin-bottom:10px;color:var(--red);font-size:12px">✖ Cancelado${x.cx.d?' em '+esc(x.cx.d):''}${x.cx.m?' — '+esc(x.cx.m):''}${x.cx.ms?' · '+esc(x.cx.ms)+' meses de casa':''}</div>` : '';
+  return `<tr class="expand"><td colspan="9"><div class="exgrid">
+    <div><h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">Composição do score</h3>${pills}</div>
+    <div>${cancInfo}<h3 style="font-size:11px;color:var(--mut);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Últimos atendimentos (${x.nt} no total)</h3>
+      <table class="tl">${tl||'<tr><td class="mini">Timeline disponível para clientes de risco (score ≥ 40) e cancelados — os demais têm os agregados acima.</td></tr>'}</table></div>
+  </div></td></tr>`;
+}
+
+function renderPager(pages){
+  const p = state.page;
+  let nums = [];
+  for (let i=1;i<=pages;i++){
+    if (i<=2 || i>pages-2 || Math.abs(i-p)<=1) nums.push(i);
+    else if (nums[nums.length-1]!=='…') nums.push('…');
+  }
+  $('#pgr').innerHTML =
+    `<button ${p<=1?'disabled':''} data-p="${p-1}">←</button>`+
+    nums.map(n=>n==='…'?'<button disabled>…</button>':`<button class="${n===p?'on':''}" data-p="${n}">${n}</button>`).join('')+
+    `<button ${p>=pages?'disabled':''} data-p="${p+1}">→</button>`;
+  $$('#pgr button[data-p]').forEach(b=>b.addEventListener('click',e=>{
+    state.page = +e.currentTarget.dataset.p; renderTable();
+  }));
+}
+
+function renderChart(){
+  const cv = $('#chart');
+  const dpr = window.devicePixelRatio||1;
+  const Wd = cv.clientWidth||900, H = 240;
+  cv.width = Wd*dpr; cv.height = H*dpr;
+  const ctx = cv.getContext('2d'); ctx.scale(dpr,dpr);
+  // navegadores antigos não têm ctx.roundRect — fallback para rect simples
+  const rrect = (x,y,wd,h,r)=>{ ctx.beginPath(); if (typeof ctx.roundRect==='function') ctx.roundRect(x,y,wd,h,r); else ctx.rect(x,y,wd,h); };
+  ctx.clearRect(0,0,Wd,H);
+  const labels = D.months.map(monthLabel), A = D.serAt, C = D.serCa;
+  if (!labels.length){ ctx.fillStyle='#6b7690'; ctx.fillText('Sem dados de data para montar a série mensal.',20,40); return; }
+  const padL=46, padR=44, padB=28, padT=14;
+  const iw = Wd-padL-padR, ih = H-padT-padB;
+  const maxA = Math.max(1,...A), maxC = Math.max(1,...C);
+  const n = labels.length, step = iw/n;
+  ctx.font = '10px '+getComputedStyle(document.body).fontFamily;
+  ctx.strokeStyle = '#141c2f'; ctx.fillStyle = '#6b7690';
+  for (let g=0;g<=4;g++){
+    const y = padT + ih - g/4*ih;
+    ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(Wd-padR,y); ctx.stroke();
+    ctx.textAlign='right'; ctx.fillText(fmt(Math.round(maxA*g/4)), padL-6, y+3);
+    ctx.textAlign='left'; ctx.fillStyle='#ff6b7a'; ctx.fillText(fmt(Math.round(maxC*g/4)), Wd-padR+6, y+3); ctx.fillStyle='#6b7690';
+  }
+  const bw = Math.min(40, step*0.5);
+  const showVals = step >= 34;                       // evita rótulos sobrepostos com muitos meses
+  const lblEvery = step >= 48 ? 1 : step >= 28 ? 2 : 3;
+  A.forEach((v,i)=>{
+    const x = padL + i*step + (step-bw)/2, h = v/maxA*ih;
+    ctx.fillStyle = '#2447ff';
+    rrect(x, padT+ih-h, bw, h, 3); ctx.fill();
+    if (showVals){ ctx.fillStyle = '#7da0ff'; ctx.textAlign='center'; ctx.fillText(fmt(v), x+bw/2, padT+ih-h-5); }
+  });
+  ctx.strokeStyle = '#ff3b4e'; ctx.lineWidth = 2; ctx.beginPath();
+  C.forEach((v,i)=>{
+    const x = padL + i*step + step/2, y = padT + ih - v/maxC*ih;
+    i?ctx.lineTo(x,y):ctx.moveTo(x,y);
+  });
+  ctx.stroke();
+  C.forEach((v,i)=>{
+    const x = padL + i*step + step/2, y = padT + ih - v/maxC*ih;
+    ctx.fillStyle = '#ff3b4e'; ctx.beginPath(); ctx.arc(x,y,3.5,0,7); ctx.fill();
+    if (showVals){ ctx.fillStyle = '#ff8d99'; ctx.textAlign='center'; ctx.fillText(fmt(v), x, y-8); }
+  });
+  ctx.fillStyle = '#6b7690'; ctx.textAlign='center';
+  labels.forEach((l,i)=>{ if (i%lblEvery===0) ctx.fillText(l, padL+i*step+step/2, H-8); });
+  $('#corrCoef').innerHTML = `r = <b style="color:${corColor(D.r0)}">${D.r0==null?'—':D.r0.toFixed(2)}</b>`+
+    (D.rLag!=null?` · r(lag 1m) = <b style="color:${corColor(D.rLag)}">${D.rLag.toFixed(2)}</b>`:'');
+}
+
+// ---------- pesos ----------
+const W_IDS = ['wFreq','wRec','wMot','wTend','wRei'];
+function readW(){
+  const [freq,rec,mot,tend,rei] = W_IDS.map(id=>Math.max(0, +$('#'+id).value||0));
+  return { freq, rec, mot, tend, rei };
+}
+function updateWSum(){
+  const w = readW();
+  const sum = w.freq+w.rec+w.mot+w.tend+w.rei;
+  const el = $('#wSum');
+  el.textContent = 'soma: '+sum+'%';
+  el.style.color = sum===100 ? 'var(--green)' : 'var(--orange)';
+}
+function openRegras(){
+  const w = weights();
+  $('#wFreq').value=w.freq; $('#wRec').value=w.rec; $('#wMot').value=w.mot; $('#wTend').value=w.tend; $('#wRei').value=w.rei;
+  updateWSum();
+  $('#ovlRegras').classList.add('show');
+}
+function saveRegras(){
+  let w = readW();
+  const sum = w.freq+w.rec+w.mot+w.tend+w.rei;
+  if (sum<=0){ $('#wErr').style.display='block'; $('#wErr').textContent='Informe ao menos um peso maior que zero.'; return; }
+  $('#wErr').style.display='none';
+  let normalized = false;
+  if (sum!==100){
+    // normaliza proporcionalmente e acerta o resíduo de arredondamento no maior peso
+    const keys = Object.keys(w);
+    keys.forEach(k=> w[k] = Math.round(w[k]*100/sum));
+    let drift = 100 - keys.reduce((s,k)=>s+w[k],0);
+    const kmax = keys.reduce((a,b)=> w[a]>=w[b]?a:b);
+    w[kmax] += drift;
+    normalized = true;
+  }
+  W = w;
+  try{ localStorage.setItem('churnWeights.v1', JSON.stringify(w)); }catch(e){}
+  $('#ovlRegras').classList.remove('show');
+  applyScores(); renderAll();
+  toast(normalized
+    ? `Pesos ajustados para somar 100% (${w.freq}/${w.rec}/${w.mot}/${w.tend}/${w.rei}) — scores recalculados.`
+    : 'Pesos aplicados — scores recalculados.');
+}
+W_IDS.forEach(id=>document.addEventListener('input', e=>{ if (e.target.id===id) updateWSum(); }));
+
+// ---------- resumo ----------
+function openResumo(){
+  if (!D){ toast('Dados ainda não carregados.', 'info'); return; }
+  const t = D.totals, L = D.clients;
+  const by = lv => L.reduce((s,x)=>s+(x.lv===lv), 0);
+  const act = L.length - by('cancelado');
+  const w = weights();
+  const topMot = D.motivoTable.slice(0,5);
+  const per = D.months.length ? monthLabel(D.months[0])+' – '+monthLabel(D.months[D.months.length-1]) : '—';
+  const pct = n => act? (n/act*100).toFixed(1)+'%' : '—';
+  $('#repPrint').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:16px">
+      <h2 style="font-size:17px">Relatório Executivo — Score de Churn</h2>
+      <span style="color:var(--blue);font-weight:700">Cancelados × Atendimentos</span></div>
+    <div class="rsec"><h4><span class="rnum">1</span>Visão geral da base · ${per}</h4>
+      <div class="r3">
+        <div class="rcard"><div class="v" style="color:var(--blue)">${fmt(t.clientes)}</div><div class="l">clientes únicos identificados nos arquivos (${fmt(t.atendimentos)} atendimentos)</div></div>
+        <div class="rcard"><div class="v" style="color:var(--purple)">${fmt(t.cancelamentos)}</div><div class="l">cancelamentos no período analisado</div></div>
+        <div class="rcard"><div class="v" style="color:var(--green)">5 pilares</div><div class="l">Frequência ${w.freq}% · Recência ${w.rec}% · Motivos ${w.mot}% · Tendência ${w.tend}% · Reincidência ${w.rei}%</div></div>
+      </div></div>
+    <div class="rsec"><h4><span class="rnum">2</span>Correlação cancelados × atendimentos</h4>
+      <div class="r3">
+        <div class="rcard"><div class="v" style="color:${corColor(D.r0)}">${D.r0==null?'—':D.r0.toFixed(2)}</div><div class="l">correlação mensal (Pearson)${D.rLag!=null?' · defasada 1 mês: '+D.rLag.toFixed(2):''}</div></div>
+        <div class="rcard"><div class="v" style="color:var(--red)">${(t.prev90pct*100).toFixed(0)}%</div><div class="l">dos cancelados abriram atendimento nos 90 dias anteriores à saída</div></div>
+        <div class="rcard"><div class="v" style="color:var(--orange)">${t.avgPrevCanc.toFixed(1)} vs ${t.avgActive90.toFixed(1)}</div><div class="l">média de atendimentos 90d: quem cancelou vs base ativa</div></div>
+      </div>
+      ${topMot.length?`<div style="margin-top:12px;font-size:11px;color:var(--mut)">Motivos com maior conversão em cancelamento:</div>
+      ${topMot.map(m=>`<div class="mbar"><span class="nm">${esc(m.label)}</span>
+        <span class="tr"><span class="fl" style="width:${Math.max(3,m.rate/Math.max(.0001,topMot[0].rate)*100)}%;background:${m.lift>=2?'var(--red)':'var(--orange)'}"></span></span>
+        <span class="pc">${(m.rate*100).toFixed(0)}% · ${m.lift.toFixed(1)}×</span></div>`).join('')}`:''}</div>
+    <div class="rsec"><h4><span class="rnum">3</span>Resultado — distribuição da base ativa (${fmt(act)} clientes)</h4>
+      <div class="r5">
+        <div class="rcard" style="border-color:#3a2a6e"><div class="v" style="color:var(--purple)">${fmt(by('cancelado'))}</div><div class="l">CANCELADOS<br>fora da base</div></div>
+        <div class="rcard" style="border-color:#54202b"><div class="v" style="color:var(--red)">${fmt(by('critico'))}</div><div class="l">CRÍTICO (80–100)<br>${pct(by('critico'))} · churn iminente</div></div>
+        <div class="rcard" style="border-color:#54401d"><div class="v" style="color:var(--orange)">${fmt(by('alto'))}</div><div class="l">ALTO RISCO (60–79)<br>${pct(by('alto'))} · agir na semana</div></div>
+        <div class="rcard" style="border-color:#4d4218"><div class="v" style="color:var(--yellow)">${fmt(by('atencao'))}</div><div class="l">ATENÇÃO (40–59)<br>${pct(by('atencao'))} · monitorar</div></div>
+        <div class="rcard" style="border-color:#1d4a32"><div class="v" style="color:var(--green)">${fmt(by('estavel'))}</div><div class="l">ESTÁVEL (0–39)<br>${pct(by('estavel'))} · saudável</div></div>
+      </div>
+      <div class="rcard" style="margin-top:10px"><div class="l" style="font-size:11px">
+        <b style="color:var(--txt)">Carteira de retenção prioritária:</b> ${fmt(by('critico')+by('alto'))} clientes
+        (${pct(by('critico')+by('alto'))} da base ativa) concentram o risco imediato de churn.
+        Recomenda-se contato ativo de retenção começando pelos Críticos com sinal "pediu cancelamento" ou "reincidente".</div></div></div>
+    <div class="rfoot"><span>Score de Churn · Cancelados vs Atendimentos · dados de ${esc(D.geradoEm)}</span>
+      <span>Frequência ${w.freq}% · Recência ${w.rec}% · Motivos ${w.mot}% · Tendência ${w.tend}% · Reincidência ${w.rei}%</span></div>`;
+  $('#ovlResumo').classList.add('show');
+}
+
+// ---------- impressão (1 página A4, tema claro p/ PDF) ----------
+function printResumo(){
+  if (!D){ toast('Dados ainda não carregados.', 'info'); return; }
+  const t = D.totals, L = D.clients;
+  const by = lv => L.reduce((s,x)=>s+(x.lv===lv), 0);
+  const act = L.length - by('cancelado');
+  const w = weights();
+  const per = D.months.length ? monthLabel(D.months[0])+' – '+monthLabel(D.months[D.months.length-1]) : '—';
+  const pct = n => act? (n/act*100).toFixed(1)+'%' : '—';
+  const topMot = D.motivoTable.slice(0,5);
+  const maxRate = Math.max(.0001, ...topMot.map(m=>m.rate));
+  // barras como texto (█) — imprimem sempre, sem depender de "imprimir fundos"
+  const txtbar = (frac, color) => `<span style="color:${color};letter-spacing:-1px">${'█'.repeat(Math.max(1, Math.round(frac*22)))}</span>`;
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Relatório Executivo — Score de Churn</title><style>
+    @page{ size:A4 portrait; margin:11mm }
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font:10.5px/1.5 'Segoe UI',Arial,sans-serif;color:#1b2330}
+    h1{font-size:17px;margin-bottom:2px} .sub{color:#5b6678;font-size:9.5px;margin-bottom:10px}
+    .sec{border:1px solid #c9d2e0;border-radius:7px;padding:8px 11px;margin-bottom:8px;page-break-inside:avoid}
+    .sec h2{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#0a6e84;margin-bottom:7px}
+    .g3{display:flex;gap:8px} .g5{display:flex;gap:6px}
+    .c{flex:1;border:1px solid #d7dee9;border-radius:6px;padding:7px 9px}
+    .v{font-size:17px;font-weight:700} .l{color:#5b6678;font-size:8.6px;line-height:1.4;margin-top:2px}
+    .mrow{display:flex;align-items:center;gap:7px;font-size:9.5px;margin-top:3px}
+    .mrow .nm{flex:0 0 220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .mrow .pc{margin-left:auto;color:#5b6678}
+    .ft{display:flex;justify-content:space-between;color:#8a93a5;font-size:8.4px;margin-top:8px}
+    .roxo{color:#6b46d6}.verm{color:#d6273a}.lar{color:#c87800}.amar{color:#a08600}.verde{color:#1d8a4e}.azul{color:#1f55d6}
+  </style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:baseline">
+      <h1>Relatório Executivo — Score de Churn</h1><b class="azul">Cancelados × Atendimentos</b></div>
+    <div class="sub">Período ${per} · dados gerados em ${esc(D.geradoEm)}</div>
+
+    <div class="sec"><h2>1 · Visão geral da base</h2><div class="g3">
+      <div class="c"><div class="v azul">${fmt(t.clientes)}</div><div class="l">clientes únicos identificados (${fmt(t.atendimentos)} atendimentos analisados)</div></div>
+      <div class="c"><div class="v roxo">${fmt(t.cancelamentos)}</div><div class="l">cancelamentos no período</div></div>
+      <div class="c"><div class="v verde">5 pilares</div><div class="l">Frequência ${w.freq}% · Recência ${w.rec}% · Motivos ${w.mot}% · Tendência ${w.tend}% · Reincidência ${w.rei}%</div></div>
+    </div></div>
+
+    <div class="sec"><h2>2 · Correlação cancelados × atendimentos</h2><div class="g3">
+      <div class="c"><div class="v ${Math.abs(D.r0||0)>=.7?'verm':'lar'}">${D.r0==null?'—':D.r0.toFixed(2)}</div><div class="l">correlação mensal (Pearson)${D.rLag!=null?' · defasada 1 mês: '+D.rLag.toFixed(2):''}</div></div>
+      <div class="c"><div class="v verm">${(t.prev90pct*100).toFixed(0)}%</div><div class="l">dos cancelados abriram atendimento nos 90 dias anteriores à saída</div></div>
+      <div class="c"><div class="v lar">${t.avgPrevCanc.toFixed(1)} vs ${t.avgActive90.toFixed(1)}</div><div class="l">média de atendimentos 90d: quem cancelou vs base ativa</div></div>
+    </div>
+    ${topMot.length?`<div style="margin-top:7px;font-size:9px;color:#5b6678">Motivos com maior conversão em cancelamento (taxa · lift sobre a base):</div>
+    ${topMot.map(m=>`<div class="mrow"><span class="nm">${esc(m.label)}</span>${txtbar(m.rate/maxRate, m.lift>=2?'#d6273a':'#c87800')}<span class="pc">${(m.rate*100).toFixed(0)}% · ${m.lift.toFixed(1)}×</span></div>`).join('')}`:''}</div>
+
+    <div class="sec"><h2>3 · Distribuição da base ativa (${fmt(act)} clientes)</h2><div class="g5">
+      <div class="c"><div class="v roxo">${fmt(by('cancelado'))}</div><div class="l">CANCELADOS<br>fora da base</div></div>
+      <div class="c"><div class="v verm">${fmt(by('critico'))}</div><div class="l">CRÍTICO (80–100)<br>${pct(by('critico'))} · churn iminente</div></div>
+      <div class="c"><div class="v lar">${fmt(by('alto'))}</div><div class="l">ALTO RISCO (60–79)<br>${pct(by('alto'))} · agir na semana</div></div>
+      <div class="c"><div class="v amar">${fmt(by('atencao'))}</div><div class="l">ATENÇÃO (40–59)<br>${pct(by('atencao'))} · monitorar</div></div>
+      <div class="c"><div class="v verde">${fmt(by('estavel'))}</div><div class="l">ESTÁVEL (0–39)<br>${pct(by('estavel'))} · saudável</div></div>
+    </div>
+    <div class="c" style="margin-top:7px"><div class="l" style="font-size:9.3px"><b style="color:#1b2330">Carteira de retenção prioritária:</b>
+      ${fmt(by('critico')+by('alto'))} clientes (${pct(by('critico')+by('alto'))} da base ativa) concentram o risco imediato.
+      Recomenda-se contato ativo começando pelos Críticos com sinal "pediu cancelamento" ou "reincidente".</div></div></div>
+
+    <div class="sec"><h2>4 · Metodologia (resumo)</h2><div class="l" style="font-size:9.2px;line-height:1.6">
+      <b>Frequência</b>: atendimentos em 90d por faixa (1→20 … 6+→100). ·
+      <b>Recência</b>: dias desde o último atendimento (≤7d→100 … &gt;90d→5). ·
+      <b>Motivos</b>: palavras-chave do chamado vs taxa real de conversão motivo→cancelamento (vale o maior). ·
+      <b>Tendência</b>: últimos 30d vs média dos 60d anteriores (≥3×→100 · ≥2×→80 · ≥1,5×→60 · estável→40 · queda→15). ·
+      <b>Reincidência</b>: mesmo motivo 2×→70 · 3+→100. Score = média ponderada pelos pesos.</div></div>
+
+    <div class="ft"><span>Score de Churn · Cancelados vs Atendimentos</span>
+      <span>impresso em ${new Date().toLocaleString('pt-BR')}</span></div>
+  </body></html>`;
+  const f = document.createElement('iframe');
+  f.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(f);
+  f.contentDocument.open(); f.contentDocument.write(html); f.contentDocument.close();
+  setTimeout(()=>{
+    try{ f.contentWindow.focus(); f.contentWindow.print(); }
+    catch(e){ toast('Não foi possível abrir a impressão: '+e.message, 'info'); }
+    setTimeout(()=>f.remove(), 4000);
+  }, 200);
+}
+
+// ---------- export ----------
+function exportCsv(){
+  if (!D){ toast('Dados ainda não carregados.', 'info'); return; }
+  const L = filtered();
+  const head = ['Cliente','CPF/CNPJ','ID Cliente','Cidade','Bairro','Telefone','Email','Situacao','Score Churn','Classificacao','Atendimentos 90d','Dias desde ultimo atendimento','Motivo predominante','Reincidencia max','Ticket medio (R$)','Meses de casa','LTV (R$)','Data cancelamento','Motivo cancelamento'];
+  const num = v => v==null?'':String(v).replace('.',',');
+  const lines = L.map(x=>[
+    x.n, x.d, x.id, tc(x.ci), tc(x.b), fmtPhone(x.tf), x.em, x.cx?'Cancelado':'Ativo', x.cx?'':x.sc, levelInfo(x.lv).lbl,
+    x.t90, x.ds==null?'':x.ds, x.mp||'', x.mr,
+    num(x.vl), num(x.ms), num(x.vl&&x.ms ? Math.round(x.vl*x.ms*100)/100 : null),
+    x.cx?x.cx.d||'':'', x.cx?x.cx.m||'':'',
+  ].map(v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"').join(';'));
+  const csv = '﻿'+head.join(';')+'\n'+lines.join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv;charset=utf-8'}));
+  a.download = 'score_churn_'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+}
+
+// ---------- eventos ----------
+$('#btnRegras').addEventListener('click', openRegras);
+$('#btnResumo').addEventListener('click', openResumo);
+$('#btnCsv').addEventListener('click', exportCsv);
+$('#btnSave').addEventListener('click', saveRegras);
+$('#btnPrint').addEventListener('click', printResumo);
+$('#btnReset').addEventListener('click', ()=>{ W=null; try{ localStorage.removeItem('churnWeights.v1'); }catch(e){} openRegras(); if(D){applyScores(); renderAll();} toast('Pesos do script restaurados.'); });
+$$('.x').forEach(b=>b.addEventListener('click', ()=>$('#'+b.dataset.close).classList.remove('show')));
+$$('.ovl').forEach(o=>o.addEventListener('click', e=>{ if (e.target===o) o.classList.remove('show'); }));
+$('#q').addEventListener('input', e=>{ state.q=e.target.value; state.page=1; renderTable(); });
+$$('.chip').forEach(c=>c.addEventListener('click', ()=>{
+  $$('.chip').forEach(x=>x.classList.remove('on')); c.classList.add('on');
+  state.f = c.dataset.f; state.page=1; renderTable();
+}));
+$('#selCidade').addEventListener('change', e=>{ state.cidade=e.target.value; state.page=1; renderTable(); });
+$('#selMotivo').addEventListener('change', e=>{ state.motivo=e.target.value; state.page=1; renderTable(); });
+$('#selOrd').addEventListener('change', e=>{ state.ord=e.target.value; state.page=1; renderTable(); });
+window.addEventListener('resize', ()=>{ if (D) renderChart(); });
+</script>
+<script src="dados_churn.js" onerror="this.remove()"></script>
+<script>dataLoaded();</script>
+</body>
+</html>
